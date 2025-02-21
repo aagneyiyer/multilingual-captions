@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Caption Extractor & Display",
+  "version": "2.0",
+  "description": "Extracts YouTube subtitles to clipboard and displays time-synced captions",
+  "permissions": ["storage", "clipboardWrite"],
+  "content_scripts": [
+      {
+          "matches": ["*://*.youtube.com/*"],
+          "js": ["content.js"],
+          "run_at": "document_end"
+      }
+  ]
+}
