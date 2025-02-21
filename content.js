@@ -267,6 +267,3 @@ observer.observe(document.body, {
 if (location.pathname === '/watch') {
     setTimeout(injectButton, 1000);
 } 
-
-// Rest of the original functions (getSubtitleTracks, injectButton, etc.) remain the same
-// ... [Keep the existing getSubtitleTracks, injectButton, and observer code unchanged] ...
