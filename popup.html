@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multilingual YouTube Captions</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Caption Settings</h2>
+    
+    <div class="settings-group">
+      <label for="language">Preferred Language:</label>
+      <select id="language" class="select-input">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="ja">Japanese</option>
+        <option value="zh">Chinese</option>
+      </select>
+    </div>
+
+    <div class="settings-group">
+      <label>Display Mode:</label>
+      <div class="radio-group">
+        <input type="radio" id="translated" name="displayMode" value="translated" checked>
+        <label for="translated">Translated</label>
+        
+        <input type="radio" id="transliterated" name="displayMode" value="transliterated">
+        <label for="transliterated">Transliterated</label>
+      </div>
+    </div>
+
+    <div class="status-message" id="status"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 
