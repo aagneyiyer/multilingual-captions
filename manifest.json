@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Multilingual YouTube Captions",
+  "version": "1.0",
+  "description": "Display and translate YouTube captions in multiple languages",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [{
+    "matches": ["https://www.youtube.com/*"],
+    "js": ["content.js"]
+  }],
+  "background": {
+    "service_worker": "background.js"
+  }
+} 

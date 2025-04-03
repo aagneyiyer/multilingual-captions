@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multilingual YouTube Captions</title>
+    <style>
+        body {
+            width: 300px;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        select, button {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #357abd;
+        }
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="option-group">
+            <label for="language">Select Caption Language for Transliteration:</label>
+            <select id="language">
+                <option value="hi">Hindi</option>
+                <option value="zh">Chinese</option>
+            </select>
+        </div>
+
+        <div id="status"></div>
+        <button id="applySettings">Apply Settings</button>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
