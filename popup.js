@@ -1,37 +1,110 @@
 const YT_API_KEY = "AIzaSyCRl5Yh4mabGYU56dKR7YP9OTUnC-nItlY";
 const MS_TRANSLITERATION_KEY = "34GJqJNyIQ4bZyiN7R4ITu2licD661X1tqPFGQNgzUNoS3ADfVmQJQQJ99BDAC8vTInXJ3w3AAAbACOGtPrx";
 
+// Available scripts for transliteration
+const SCRIPTS = [
+    { code: 'en', name: 'Latin' },
+    { code: 'hi', name: 'Devanagari' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'th', name: 'Thai' }
+];
+
+// Available languages for translation
+const LANGUAGES = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'it', name: 'Italian' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'ru', name: 'Russian' }
+];
+
+// Helper function to get language display name
+function getLanguageName(code, type = '') {
+    const names = {
+        'hi': 'Devanagari',
+        'zh': 'Chinese',
+        'en': 'Latin',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'ar': 'Arabic',
+        'th': 'Thai'
+    };
+    const displayName = names[code] || code.toUpperCase();
+    return type ? `${displayName} (${type})` : displayName;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Load saved preferences
     const settings = await chrome.storage.sync.get({
-        language: 'hi'
+        mode: 'transliterate',
+        fromLanguage: '',
+        toLanguage: 'en',
+        msTransliterationKey: MS_TRANSLITERATION_KEY
     });
 
-    document.getElementById('language').value = settings.language;
+    const modeSelect = document.getElementById('mode');
+    const fromSelect = document.getElementById('fromLanguage');
+    const toSelect = document.getElementById('toLanguage');
+
+    // Set initial mode
+    modeSelect.value = settings.mode;
+
+    // Handle mode changes
+    modeSelect.addEventListener('change', () => {
+        updateToOptions(modeSelect.value);
+    });
+
+    // Get current tab and populate languages if it's a YouTube video
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.url.includes('youtube.com/watch')) {
+        const videoId = new URL(tab.url).searchParams.get('v');
+        const languages = await fetchMetadata(videoId);
+        
+        // Populate "from" language dropdown
+        fromSelect.innerHTML = languages.map(lang => 
+            `<option value="${lang.code}" ${lang.code === settings.fromLanguage ? 'selected' : ''}>
+                ${lang.name}
+            </option>`
+        ).join('');
+        
+        // Set default if no saved preference
+        if (!settings.fromLanguage && languages.length > 0) {
+            settings.fromLanguage = languages[0].code;
+        }
+    }
+
+    // Initial population of "to" options based on mode
+    updateToOptions(settings.mode, settings.toLanguage);
 
     document.getElementById('applySettings').addEventListener('click', async () => {
-        const language = document.getElementById('language').value;
+        const mode = modeSelect.value;
+        const fromLanguage = fromSelect.value;
+        const toLanguage = toSelect.value;
 
         // Save preferences
         await chrome.storage.sync.set({
-            language
+            mode,
+            fromLanguage,
+            toLanguage
         });
 
-        // Get current tab
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
         if (tab.url.includes('youtube.com/watch')) {
-            // Get video metadata using YouTube API
-            const videoId = new URL(tab.url).searchParams.get('v');
-            const metadata = await fetchMetadata(videoId);
-            
-            // Send settings and metadata to content script
+            // Send settings to content script
             await chrome.tabs.sendMessage(tab.id, {
                 type: 'APPLY_SETTINGS',
                 settings: {
-                    language,
-                    vidLang: metadata[0].code,
-                    hasCaption: metadata.some(lang => lang.type === 'caption'),
+                    mode,
+                    sourceLanguage: fromLanguage,
+                    targetLanguage: toLanguage,
                     msTransliterationKey: MS_TRANSLITERATION_KEY
                 }
             });
@@ -46,23 +119,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// Helper function to get human-readable language names
-function getLanguageName(code) {
-    if (!code) return 'Unknown';
-    try {
-        // Use Intl.DisplayNames if available
-        const displayName = new Intl.DisplayNames(['en'], { type: 'language' }).of(code);
-        return displayName || code.toUpperCase();
-    } catch (e) {
-        // Fallback for basic language codes if Intl.DisplayNames fails or code is non-standard
-        const langMap = {
-            'en': 'English', 'es': 'Spanish', 'hi': 'Hindi', 'zh': 'Chinese',
-            'fr': 'French', 'de': 'German', 'ja': 'Japanese', 'ko': 'Korean',
-            'ar': 'Arabic', 'ru': 'Russian', 'pt': 'Portuguese', 'it': 'Italian'
-            // Add more common codes as needed
-        };
-        return langMap[code.toLowerCase()] || code.toUpperCase();
-    }
+function updateToOptions(mode, selectedValue = '') {
+    const toSelect = document.getElementById('toLanguage');
+    const options = mode === 'transliterate' ? SCRIPTS : LANGUAGES;
+    
+    toSelect.innerHTML = options.map(item => 
+        `<option value="${item.code}" ${item.code === selectedValue ? 'selected' : ''}>
+            ${item.name}
+        </option>`
+    ).join('');
 }
 
 async function fetchMetadata(videoId) {
@@ -73,25 +138,7 @@ async function fetchMetadata(videoId) {
         const videoData = await videoResponse.json();
 
         if (!videoData.items || videoData.items.length === 0) {
-            console.warn('Video not found or API key issue for video details.');
-            // Return a default structure even if video details fail, so UI can show something
-            return [{ code: 'en', name: 'English (Default)', type: 'default' }];
-        }
-
-        const video = videoData.items[0];
-        const videoLanguageCode = video.snippet.defaultLanguage || video.snippet.defaultAudioLanguage;
-
-        const fromLanguages = [];
-        const addedLangCodes = new Set(); // To avoid duplicates
-
-        if (videoLanguageCode) {
-            const langName = getLanguageName(videoLanguageCode);
-            fromLanguages.push({
-                code: videoLanguageCode,
-                name: `${langName} (Video Language)`,
-                type: 'video'
-            });
-            addedLangCodes.add(videoLanguageCode);
+            throw new Error('Video not found');
         }
 
         // Fetch caption tracks
@@ -99,36 +146,36 @@ async function fetchMetadata(videoId) {
         const captionsResponse = await fetch(captionsUrl);
         const captionsData = await captionsResponse.json();
 
+        const video = videoData.items[0];
+        const languages = [];
+
+        // Add video's default language
+        const defaultLang = video.snippet.defaultLanguage || video.snippet.defaultAudioLanguage;
+        if (defaultLang) {
+            languages.push({
+                code: defaultLang,
+                name: getLanguageName(defaultLang, 'Video Language'),
+                type: 'video'
+            });
+        }
+
+        // Add caption tracks
         if (captionsData.items && captionsData.items.length > 0) {
             captionsData.items.forEach(caption => {
                 const langCode = caption.snippet.language;
-                if (langCode && !addedLangCodes.has(langCode)) {
-                    // caption.snippet.name can be like "English" or "English (auto-generated)"
-                    const captionDisplayName = caption.snippet.name || getLanguageName(langCode);
-                    fromLanguages.push({
+                if (!languages.some(l => l.code === langCode)) {
+                    languages.push({
                         code: langCode,
-                        name: `${captionDisplayName} (Caption)`,
+                        name: getLanguageName(langCode, 'Caption'),
                         type: 'caption'
                     });
-                    addedLangCodes.add(langCode);
                 }
             });
         }
-        
-        // If no languages were found from video or captions, add a default
-        if (fromLanguages.length === 0) {
-             fromLanguages.push({
-                code: 'en',
-                name: 'English (Default)',
-                type: 'default'
-            });
-        }
 
-        return fromLanguages; // This is now an array of {code, name, type}
-
+        return languages;
     } catch (error) {
         console.error('Error fetching metadata:', error);
-        // Return a default structure on error, e.g., English
-        return [{ code: 'en', name: 'English (Error - Default)', type: 'error' }];
+        return [];
     }
 }

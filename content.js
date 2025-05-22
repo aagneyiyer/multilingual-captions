@@ -6,8 +6,13 @@ let currentSettings = null;
 
 // Language mapping for Microsoft Transliteration API
 const LANG_SCRIPT_MAP = {
-    'hi': { fromScript: 'Deva', toScript: 'Latn' },
-    'zh': { fromScript: 'Hans', toScript: 'Latn' }
+    'hi': { script: 'Deva' },  // Devanagari
+    'zh': { script: 'Hans' },  // Chinese Simplified
+    'ja': { script: 'Jpan' },  // Japanese
+    'ko': { script: 'Kore' },  // Korean
+    'ar': { script: 'Arab' },  // Arabic
+    'th': { script: 'Thai' },  // Thai
+    'en': { script: 'Latn' }   // Latin
 };
 
 // Listen for settings from popup
@@ -62,53 +67,90 @@ function parseSubtitles(subtitleText) {
     return cues;
 }
 
-async function transliterateText(text) {
-    console.log('Attempting to transliterate:', text);
-    console.log('Current settings:', currentSettings);
-    
+async function processText(text) {
     if (!currentSettings?.msTransliterationKey) {
-        console.error('No transliteration API key found');
-        return text;
-    }
-    
-    if (!LANG_SCRIPT_MAP[currentSettings.language]) {
-        console.error('Unsupported language for transliteration:', currentSettings.language);
+        console.error('No API key found');
         return text;
     }
 
-    const langConfig = LANG_SCRIPT_MAP[currentSettings.language];
-    console.log('Using language config:', langConfig);
+    const sourceLanguage = currentSettings.sourceLanguage;
+    const targetLanguage = currentSettings.targetLanguage;
+    
+    try {
+        if (currentSettings.mode === 'transliterate') {
+            return await transliterateText(text, sourceLanguage, targetLanguage);
+        } else {
+            return await translateText(text, sourceLanguage, targetLanguage);
+        }
+    } catch (error) {
+        console.error('Error processing text:', error);
+        return text;
+    }
+}
+
+async function transliterateText(text, sourceLanguage, targetLanguage) {
+    if (!LANG_SCRIPT_MAP[sourceLanguage] || !LANG_SCRIPT_MAP[targetLanguage]) {
+        console.error('Unsupported language combination for transliteration:', sourceLanguage, targetLanguage);
+        return text;
+    }
+
+    const fromScript = LANG_SCRIPT_MAP[sourceLanguage].script;
+    const toScript = LANG_SCRIPT_MAP[targetLanguage].script;
+    
+    console.log('Using script configuration:', { fromScript, toScript });
     
     try {
         const url = 'https://api.cognitive.microsofttranslator.com/transliterate?api-version=3.0' +
-            `&language=${currentSettings.language}` +
-            `&fromScript=${langConfig.fromScript}` +
-            `&toScript=${langConfig.toScript}`;
+            `&language=${sourceLanguage}` +
+            `&fromScript=${fromScript}` +
+            `&toScript=${toScript}`;
             
-        console.log('Making API request to:', url);
-        
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Ocp-Apim-Subscription-Key': currentSettings.msTransliterationKey,
                 'Ocp-Apim-Subscription-Region': 'westus2',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify([{ Text: text }])
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Transliteration API error:', errorText);
-            throw new Error(`Transliteration request failed: ${response.status} ${response.statusText}`);
+            throw new Error(`Transliteration request failed: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Transliteration API response:', data);
         return data[0]?.text || text;
     } catch (error) {
-        console.error('Error during transliteration:', error);
+        console.error('Transliteration error:', error);
+        return text;
+    }
+}
+
+async function translateText(text, sourceLanguage, targetLanguage) {
+    try {
+        const url = 'https://api.cognitive.microsofttranslator.com/translate?api-version=3.0' +
+            `&from=${sourceLanguage}` +
+            `&to=${targetLanguage}`;
+            
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Ocp-Apim-Subscription-Key': currentSettings.msTransliterationKey,
+                'Ocp-Apim-Subscription-Region': 'westus2',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify([{ Text: text }])
+        });
+
+        if (!response.ok) {
+            throw new Error(`Translation request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data[0]?.translations[0]?.text || text;
+    } catch (error) {
+        console.error('Translation error:', error);
         return text;
     }
 }
@@ -124,7 +166,7 @@ function startCaptionDisplay(cues) {
     if (!videoElement) return;
 
     let lastText = '';
-    let lastTransliteration = '';
+    let lastProcessedText = '';
 
     async function updateCaption() {
         const currentTime = videoElement.currentTime;
@@ -134,14 +176,14 @@ function startCaptionDisplay(cues) {
 
         if (activeCue) {
             try {
-                // Only transliterate if the text has changed
+                // Only process if the text has changed
                 if (activeCue.text !== lastText) {
-                    console.log('Caption text changed, transliterating:', activeCue.text);
+                    console.log('Caption text changed, processing:', activeCue.text);
                     lastText = activeCue.text;
-                    lastTransliteration = await transliterateText(activeCue.text);
-                    console.log('Transliteration result:', lastTransliteration);
+                    lastProcessedText = await processText(activeCue.text);
+                    console.log('Processed result:', lastProcessedText);
                 }
-                captionDisplay.textContent = lastTransliteration;
+                captionDisplay.textContent = lastProcessedText;
             } catch (error) {
                 console.error('Error in updateCaption:', error);
                 captionDisplay.textContent = activeCue.text; // Fallback to original text
@@ -149,7 +191,7 @@ function startCaptionDisplay(cues) {
         } else {
             captionDisplay.textContent = '';
             lastText = '';
-            lastTransliteration = '';
+            lastProcessedText = '';
         }
     }
 
@@ -251,7 +293,7 @@ async function extractAndDisplayCaptions() {
         }
 
         // Find the track that matches the user's preferred language
-        const preferredTrack = tracks.find(track => track.languageCode === currentSettings.language) || tracks[0];
+        const preferredTrack = tracks.find(track => track.languageCode === currentSettings.sourceLanguage) || tracks[0];
         
         const response = await fetch(preferredTrack.baseUrl);
         const subtitleText = await response.text();
@@ -269,7 +311,9 @@ async function initializeExtension() {
     try {
         // Try to load settings if they exist
         const settings = await chrome.storage.sync.get({
-            language: 'en',
+            sourceLanguage: 'en',
+            targetLanguage: 'en',
+            mode: 'translate',
             displayType: 'translated',
             msTransliterationKey: ''
         });

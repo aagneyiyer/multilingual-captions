@@ -17,6 +17,7 @@
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ccc;
+            width: 100%;
         }
         button {
             background-color: #4285f4;
@@ -34,36 +35,36 @@
         }
         label {
             font-weight: bold;
+            font-size: 14px;
+        }
+        #status {
+            color: #4285f4;
+            text-align: center;
+            min-height: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="option-group">
-            <label for="fromLanguage">Transliterate From:</label>
-            <select id="fromLanguage">
-                <!-- Options will be populated by popup.js -->
+            <label for="mode">Mode:</label>
+            <select id="mode">
+                <option value="transliterate">Transliterate (Convert Script)</option>
+                <option value="translate">Translate (Convert Language)</option>
             </select>
         </div>
 
         <div class="option-group">
-            <label for="toLanguage">Transliterate To:</label>
+            <label for="fromLanguage">From Language:</label>
+            <select id="fromLanguage">
+                <option value="">Loading available languages...</option>
+            </select>
+        </div>
+
+        <div class="option-group">
+            <label for="toLanguage">To:</label>
             <select id="toLanguage">
-                <!-- Options will be populated by popup.js -->
-                <!-- Common languages for 'to' transliteration -->
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="hi">Hindi</option>
-                <option value="zh-CN">Chinese (Simplified)</option> 
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="ar">Arabic</option>
-                <option value="ru">Russian</option>
-                <option value="pt">Portuguese</option>
-                <option value="it">Italian</option>
-                <!-- Add more major languages as needed -->
+                <option value="">Loading options...</option>
             </select>
         </div>
 
